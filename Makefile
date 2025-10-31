@@ -3,25 +3,35 @@
 SCRIPT := main
 EXE := main.exe
 PYTHON := python
-PIP := $(PYTHON) -m pip
 PYINSTALLER_OPTS := --onefile --noconsole
 REQS := requirements.txt
-
-# Force Windows CMD shell
-SHELL := cmd.exe
+VENV := .venv
 
 .PHONY: run build clean install
 
+define run_in_venv
+	@echo Removing existing temporary virtual environment (if any)...
+	if exist $(VENV) rmdir /s /q $(VENV)
+	@echo Creating temporary virtual environment...
+	$(PYTHON) -m venv $(VENV)
+	@echo Installing dependencies...
+	$(VENV)\Scripts\python.exe -m pip install --upgrade pip
+	$(VENV)\Scripts\python.exe -m pip install -r $(REQS)
+	@echo Running: $(1)
+	$(1)
+	@echo Removing temporary virtual environment...
+	if exist $(VENV) rmdir /s /q $(VENV)
+endef
+
 install:
-	$(PIP) install --upgrade pip
-	$(PIP) install -r $(REQS)
+	@echo Installing dependencies in temporary venv...
+	$(call run_in_venv,$(VENV)\Scripts\python.exe -c "print('Dependencies installed successfully.')")
 
-run: install
-	$(PYTHON) $(SCRIPT).py
+run:
+	$(call run_in_venv,$(VENV)\Scripts\python.exe $(SCRIPT).py)
 
-build: install
-	@echo Building executable...
-	pyinstaller $(PYINSTALLER_OPTS) $(SCRIPT).py
+build:
+	$(call run_in_venv,$(VENV)\Scripts\python.exe -m PyInstaller $(PYINSTALLER_OPTS) $(SCRIPT).py)
 	@echo Moving executable to parent directory...
 	if exist dist\$(EXE) (move /Y dist\$(EXE) .)
 	@echo Cleaning up build artifacts...
@@ -35,3 +45,5 @@ clean:
 	if exist dist rmdir /s /q dist
 	if exist __pycache__ rmdir /s /q __pycache__
 	if exist $(SCRIPT).spec del /f /q $(SCRIPT).spec
+	if exist main.exe del /f /q main.exe
+	if exist .venv rmdir /s /q .venv
